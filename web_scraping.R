@@ -5,6 +5,8 @@ Sys.setenv(SPOTIFY_CLIENT_SECRET = "23eb092bb89f408d8023a3523305b475")
 library(rvest)
 library(magrittr)
 library(stringr)
+library(tidyverse)
+library(spotifyr)
 
 #main url
 spotify_charts <- read_html(x = "https://spotifycharts.com/regional/global/daily/latest")
@@ -13,9 +15,13 @@ spotify_charts <- read_html(x = "https://spotifycharts.com/regional/global/daily
 top_artists <- spotify_charts %>% 
   html_node("#content > div > div > div > span > table > tbody") %>%
   html_children() %>%
-  html_nodes("span")
+  html_nodes("span") %>%
+  str_replace(pattern = "<span>by ", "") %>%
+  str_replace(pattern = "</span>", "") %>%
+  unique()
 
-str_extract(top_artists, pattern = "")
+#extract audio features from Spotify API
+spotify_df <- sapply(top_artists, function(x){
+  get_artist_audio_features(x)
+})
 
-#extract audio features from Spotify API    
-spotify_df <- get_artist_audio_features('radiohead')
