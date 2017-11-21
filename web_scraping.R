@@ -7,6 +7,7 @@ library(magrittr)
 library(stringr)
 library(tidyverse)
 library(spotifyr)
+library(purrr)
 
 #main url
 spotify_charts <- read_html(x = "https://spotifycharts.com/regional/global/daily/latest")
@@ -20,8 +21,28 @@ top_artists <- spotify_charts %>%
   str_replace(pattern = "</span>", "") %>%
   unique()
 
+#scrape the Top 200 songs
+top_songs <- spotify_charts %>% 
+  html_node("#content > div > div > div > span > table > tbody") %>%
+  html_children() %>%
+  html_nodes("strong") %>%
+  str_replace(pattern = "<strong>", "") %>%
+  str_replace(pattern = "</strong>", "") %>%
+  str_replace(pattern = "&amp;", "&")
+
 #extract audio features from Spotify API
-spotify_df <- sapply(top_artists, function(x){
-  get_artist_audio_features(x)
+spotify_df <- map(top_artists, function(x){
+  tryCatch(
+  get_artist_audio_features(x),
+  error = function(e){NA}
+  )
 })
 
+#combine the dataframes and save
+spotify <- do.call("rbind", spotify_df)
+saveRDS(spotify, file = "spotify.rds")
+
+
+
+  
+  
