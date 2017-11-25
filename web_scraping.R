@@ -38,8 +38,11 @@ spotify_df <- map(top_artists, function(x){
   )
 })
 
-#combine the dataframes and save
-spotify <- do.call("rbind", spotify_df)
+#combine the dataframes and remove missing values
+spotify <- do.call("rbind", spotify_df) 
+spotify <- spotify %>% filter(track_name != "NA")
+
+#save spotify as a rds file
 saveRDS(spotify, file = "spotify.rds")
 
 
