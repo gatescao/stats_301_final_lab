@@ -24,7 +24,13 @@ plots <- lapply(columns, plot, data = spotify)
 plots_top_200 <- lapply(columns, plot, data = top_200)
 
 #rankings
-rank <- 
+rank <- function(data, column) {
+data %>%
+    select(track_name, column) %>%
+    arrange(column)
+}
+
+ranking <- lapply(columns, rank, data = spotify)
 
 #correlation matrix
 cor_mat <- spotify %>%
