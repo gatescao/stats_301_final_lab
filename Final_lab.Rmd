@@ -129,26 +129,25 @@ time_series <- spotify %>%
 head(time_series, 10)
 ```
 
-With the adjustment, we can see that all the variables have been transformed into indexes and start at the same point in 1983 at the value of 1. Now let's 
+With the adjustment, we can see that all the variables have been transformed into indexes using 1983 as the base year and start at the same point at the value of 1. The new dataset is saved as `time_series`. However, before we use `ggplot` to make a time-series visualization, we need to first reshape the data into a long form using the `melt` function in the `reshape2` package. 
 
 ```{r,message=FALSE}
 #reshape the data by melting it to prepare for visualization
 require(reshape2)
 time_series_melt <- melt(time_series, id.vars = "year")
+head(time_series_melt,10)
 ```
+
+The dataset now has been melted into a long form that is ready to be passed into `ggplot` for visualization. 
 
 ```{r}
 ggplot(time_series_melt, aes(year, value, group = variable, colour= variable)) +
   geom_line()
 ```
 
-The change in `acousticness` is extremely volatile and has prevented us from seeing the trends of other variables. Let's zoom in the graph.
+We can see that the change in `acousticness` is extremely volatile. Such dramatic trend is probably due to the limitations of our dataset. Because we use the albums by the most recent popular artists, the number of tracks in our dataset diminishes as we go back in time. For example, the only album released in 1983 in the dataset is Michael Jackson's "Fantastic", which may not be representative of audio features of other artists back then. Since it's the limitations of the dataset, there's little we can do.
 
-```{r}
-ggplot(time_series_melt, aes(year, value, group = variable, colour= variable)) +
-  geom_line() +
-  coord_cartesian(ylim = c(0,1.5))
-```
+The volativity of `acousticness` has prevented us from seeing the trends of other variables. Let's drop it.
 
 ```{r}
 time_series_melt %>%
@@ -157,8 +156,21 @@ time_series_melt %>%
   geom_line()
 ```
 
-###Correlation 
+After removing `acoustincess`, we can see the trends of other variables more clearly. We can see most of the variables have relatively steady trend clustering below between 0.5 and 1.5. The exceptions are `liveness`, `speechiness` and `instrumentalness`. `liveness` had two peaks in 1993 and 2000, suggesting that the probability of the track being performed live is high in these 2 years. `speechiness` has an upward trend starting in year 2000, suggesting that song tracks contain more speech than music. `instrumentalness` is low throughout the years, which means that the tracks contain more vocal contents than instrumental contents. Let's zoom in further to see more details.
+
 ```{r}
+ggplot(time_series_melt, aes(year, value, group = variable, colour= variable)) +
+  geom_line() +
+  coord_cartesian(ylim = c(0,1.5))
+```
+
+`valence` is noteworthy because it has several big dips throughout the 1990s, indicating that the tracks were less positive in these years. 
+
+###Correlation 
+We've explored the distributions and time-series trends of the variables so far. Now we'd like to investigate the relationships between the variables. Let's start with correlation.
+
+```{r}
+#create correlation matrix
 cor_mat <- spotify %>%
   select(danceability, energy, loudness, speechiness, acousticness, instrumentalness, liveness, 
          valence, tempo, duration_ms, track_popularity) %>%
@@ -167,6 +179,7 @@ cor_mat <- spotify %>%
 ```
 
 ```{r,message=FALSE}
+#visualize the correlation matrix
 require(corrplot)
 corrplot(cor_mat, method = "circle")
 ```
@@ -227,6 +240,7 @@ The predictive variables are all statistically significant but R-squared of the 
 
 ```{r}
 popularity_backAIC <- step(popularity_full, direction = "backward")
+
 summary(popularity_backAIC)
 ```
 
@@ -240,4 +254,6 @@ summary(popularity_null)
 popularity_forwardAIC <- step(popularity_null, direction = "forward", scope = formula(popularity_full))
 summary(popularity_forwardAIC)
 ```
+
+###Conclusion
 
