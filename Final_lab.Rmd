@@ -4,24 +4,240 @@ author: "Gates Cao"
 date: "11/2/2017"
 output: html_document
 ---
+```{r,message=FALSE}
+#load packages
+library(lubridate)
+library(magrittr)
+library(tidyverse)
+library(gridExtra)
+```
+###Introduction
+This exploratory data analysis aims to analyze the audio features of song tracks available on Spotify. We intend to explore the distributions of the audio features, the relationships between the variables, and whether the features predict track popularity.
+
+###Data source
+The dataset is obtained from Spotify's Web API. First, we scraped the Spotify Top 200 Charts at `https://spotifycharts.com/regional` to obtain a list of artists whose tracks are featured on the chart. Next, we used the `spotifyr` package written by `charlie86` to access Spotify's Web API and extract data on those artists' recorded albums and tracks on Spotify. The package can be downloaded using `devtools::install_github('charlie86/spotifyr')`. After cleaning, the final dataset has 8547 observations and 19 variables in total.
+
+Spotify audio features are provided by The Echo Nest, a music intelligence service, which include danceability, energy, loudness, acousticness, valence, instrumentalness, speechiness, key, mode,  track popularity and etc.. Detailed description of the features are provided in the codebook. 
+
+###Summary statistics 
 ```{r}
-library(spotifyr)
+#load data
+spotify <- readRDS("data/processed/spotify.rds")
 ```
 
-Acousticness: A confidence measure from 0.0 to 1.0 of whether the track is acoustic. 1.0 represents high confidence the track is acoustic
+First, let's take a glance at the dataset to obtain an initial idea of what we are dealing with. 
 
-danceability: Danceability describes how suitable a track is for dancing based on a combination of musical elements including tempo, rhythm stability, beat strength, and overall regularity. A value of 0.0 is least danceable and 1.0 is most danceable.
+```{r}
+glimpse(spotify)
+summary(spotify)
+```
 
-energy: Energy is a measure from 0.0 to 1.0 and represents a perceptual measure of intensity and activity. Typically, energetic tracks feel fast, loud, and noisy. For example, death metal has high energy, while a Bach prelude scores low on the scale. Perceptual features contributing to this attribute include dynamic range, perceived loudness, timbre, onset rate, and general entropy.
+The dataset contains all of the albums and song tracks by the featured artists available on Spotify. The audio features can be divided into two categories: continuous and discrete. In addition, some continuous audio features, such as danceability, energy, speechiness, liveness and valence, are measured on a scale from 0 to 1, while others, such as loudness, tempo, and duration, are on different scales.
 
-instrumentalness: Predicts whether a track contains no vocals. "Ooh" and "aah" sounds are treated as instrumental in this context. Rap or spoken word tracks are clearly "vocal". The closer the instrumentalness value is to 1.0, the greater likelihood the track contains no vocal content. Values above 0.5 are intended to represent instrumental tracks, but confidence is higher as the value approaches 1.0.
+###Visualizing distributions
 
-liveliness: Detects the presence of an audience in the recording. Higher liveness values represent an increased probability that the track was performed live. A value above 0.8 provides strong likelihood that the track is live.
+Now we'd like to visualize the distributions of the audio features. For continuous variables, we will use histograms. For discrete variables, we will use bar plots.
 
-loundess: The overall loudness of a track in decibels (dB). Loudness values are averaged across the entire track and are useful for comparing relative loudness of tracks. Loudness is the quality of a sound that is the primary psychological correlate of physical strength (amplitude). Values typical range between -60 and 0 db.
+Because the process of making these plots are essentially identical, we first write a function for plotting to avoid unnecessary repetitions and then apply the function to the variables to plot histograms. 
+```{r}
+#function to plot histograms for continous variables
+plot_histogram <- function(data, columns) {
+  ggplot(data, aes_string(x = columns)) +
+    geom_histogram(aes(y = ..density..), bins = 30, colour = "black", fill = "#56B4E9" ) +
+    ggtitle(paste0("Distribution of ", columns))
+}
+```
 
-speechiness: Speechiness detects the presence of spoken words in a track. The more exclusively speech-like the recording (e.g. talk show, audio book, poetry), the closer to 1.0 the attribute value. Values above 0.66 describe tracks that are probably made entirely of spoken words. Values between 0.33 and 0.66 describe tracks that may contain both music and speech, either in sections or layered, including such cases as rap music. Values below 0.33 most likely represent music and other non-speech-like tracks.
+```{r,warning=FALSE}
+#apply the function to the continuous variables and store the plots in a list
+continuous <- names(spotify)[c(5,6,8,10:16,19)]
+histogram_plots <- lapply(continuous, plot_histogram, data = spotify)
+```
 
-tempo: The overall estimated tempo of a track in beats per minute (BPM). In musical terminology, tempo is the speed or pace of a given piece and derives directly from the average beat duration.
+```{r,warning=FALSE}
+#arrange multiple plots
+grid.arrange(histogram_plots[[1]], histogram_plots[[2]], 
+          histogram_plots[[3]], histogram_plots[[4]],
+          histogram_plots[[5]], histogram_plots[[6]],
+          ncol = 2, nrow = 3)
+grid.arrange(histogram_plots[[7]], histogram_plots[[8]],
+          histogram_plots[[9]], histogram_plots[[10]],
+          histogram_plots[[11]], 
+          ncol = 2, nrow = 3)
+```
 
-valence: A measure from 0.0 to 1.0 describing the musical positiveness conveyed by a track. Tracks with high valence sound more positive (e.g. happy, cheerful, euphoric), while tracks with low valence sound more negative (e.g. sad, depressed, angry).
+We can see that `danceability` and `energy` have very similar left-skewed distributions. The tracks in the dataset all have relatively high level of danceability and energy. On the contrary, the distributions of `speechiness`, `acousticness`,  `instrumentalness` and `liveness` are highly right skewed, indicating that most of the tracks have lower level of such features. The distributions of `valence`, `tempo`, and `track_popularity` are approximately symmetrical to the middle, showing balanced distributions. 
+
+Now let's turn to the discrete variables. We repeat the same process for those variables. First, we write a function to plot bar plots and then apply the function to the variables. 
+```{r}
+#function to plot bar plots for discrete variables
+plot_bar <- function(data, columns) {
+  ggplot(data, aes_string(x = columns)) +
+  geom_bar(colour = "black", fill = "#56B4E9") +
+  ggtitle(paste0("Distribution of ", columns))
+}
+```
+
+```{r,warning=FALSE}
+#apply the function to the discrete variables and store the plots in a list
+discrete <- names(spotify)[c(7,9,17)]
+bar_plots <- lapply(discrete, plot_bar, data = spotify)
+
+#arrange multiple plots
+grid.arrange(bar_plots[[1]], bar_plots[[2]], 
+          bar_plots[[3]],
+          ncol = 2, nrow = 2)
+```
+
+In the distribution of `key`, we can see that most tracks are in C# with a count of over 1,200 while only less than 200 tracks are in D#. The other keys are about evenly distributed. About 5,000 tracks are in major mode and 3,500 tracks are in minor mode. For `time_signature`, 4 is dominant which means that the majority of the tracks have 4 beats in a measure.
+
+###Time series analysis
+We've explored the summary statistics and distributions of the variables, and now we are interested in exploring how these variables have evolved over the years. The earliest album in the dataset was first released in 1983 and the latest was released in 2017. It'd be interesting to see how the audio features of popular tracks have changed over the span of over 3 decades.
+
+Since the variables are on different scales, it wouldn't make sense to plot them on the same graph without some adjustments. But since we are only interested in the trend of the change of the variables over time, we can turn them into index by using 1983 as the base year and then plot them on the same graph. 
+
+For each year, we use the median value for each variable among all tracks released in that year as our data point. Median is more appropriate here because it is robust to outliers. 
+
+```{r}
+#create the time series dataset
+time_series <- spotify %>%
+  mutate(year = year(album_release_year)) %>%
+  group_by(year) %>%
+  summarise(danceability = median(danceability),
+            energy = median(energy),
+            loudness = median(loudness),
+            speechiness = median(speechiness),
+            acousticness = median(acousticness),
+            instrumentalness = median(instrumentalness),
+            liveness = median(liveness),
+            valence = median(valence),
+            tempo = median(tempo),
+            duration = median(duration_ms)) %>%
+  filter(is.na(year) == FALSE) %>%
+  transmute(year = year,
+         danceability = danceability/danceability[year == 1983],
+         energy = energy/energy[year == 1983],
+         loudness = loudness/loudness[year == 1983],
+         speechiness = speechiness/speechiness[year == 1983],
+         acousticness = acousticness/acousticness[year == 1983],
+         instrumentalness = instrumentalness/instrumentalness[year == 1983],
+         liveness = liveness/liveness[year == 1983],
+         valence = valence/valence[year == 1983],
+         tempo = tempo/tempo[year == 1983],
+         duration = duration/duration[year == 1983])
+
+head(time_series, 10)
+```
+
+With the adjustment, we can see that all the variables have been transformed into indexes and start at the same point in 1983 at the value of 1. Now let's 
+
+```{r,message=FALSE}
+#reshape the data by melting it to prepare for visualization
+require(reshape2)
+time_series_melt <- melt(time_series, id.vars = "year")
+```
+
+```{r}
+ggplot(time_series_melt, aes(year, value, group = variable, colour= variable)) +
+  geom_line()
+```
+
+The change in `acousticness` is extremely volatile and has prevented us from seeing the trends of other variables. Let's zoom in the graph.
+
+```{r}
+ggplot(time_series_melt, aes(year, value, group = variable, colour= variable)) +
+  geom_line() +
+  coord_cartesian(ylim = c(0,1.5))
+```
+
+```{r}
+time_series_melt %>%
+  filter(variable != "acousticness") %>%
+  ggplot(aes(year, value, group = variable, colour= variable)) +
+  geom_line()
+```
+
+###Correlation 
+```{r}
+cor_mat <- spotify %>%
+  select(danceability, energy, loudness, speechiness, acousticness, instrumentalness, liveness, 
+         valence, tempo, duration_ms, track_popularity) %>%
+  cor() %>%
+  round(4)
+```
+
+```{r,message=FALSE}
+require(corrplot)
+corrplot(cor_mat, method = "circle")
+```
+
+
+The correlation matrix shows that there is a significant positive correlation between `energy` and `loudness`, which is intuitively straightforward. The pairs of `acousticness` and `energy`, and `speechiness` and `loudness` have obvious negative correlations. However, most of the variables have no strong correlations with each other. 
+
+Since we are interested in investigating the predictive power of the audio features on track popularity, this initial correlation analysis suggests that there is no strong relationship between any of the features and popularity. To further explore the relationships, we'd like to visualize them by plotting hexagonal heatmaps. The reason why we choose `geom_hex` instead of `geom_plot` is to avoid overplotting. 
+
+Similar to the process of creating histograms and bar plots above, we first write a hexagonal heatmap plotting function and then apply the function to the variables.
+
+```{r}
+#create hexagonal heatmap plot function
+plot_hex <- function(data, y, x) {
+  data %>%
+    ggplot(aes_string(x = x, y = y)) +
+    geom_hex()
+}
+```
+
+```{r}
+#apply the function to the variables and store the plots in a list
+hex_plots <- lapply(continuous[-11], plot_hex, data = spotify, y = "track_popularity")
+```
+
+```{r}
+#arrange multiple plots
+grid.arrange(hex_plots[[1]], hex_plots[[2]], 
+             hex_plots[[3]], hex_plots[[4]],
+             ncol = 2, nrow = 2)
+grid.arrange(hex_plots[[5]], hex_plots[[6]], 
+             hex_plots[[7]],hex_plots[[8]], 
+             ncol = 2, nrow = 2)
+grid.arrange(hex_plots[[9]], hex_plots[[10]], 
+             ncol = 2, nrow = 2)
+```
+
+The plots verify the result we saw from the correlation matrix earlier. There's no clear pattern in the relationships between the audio features and track popularity. 
+
+###Modeling
+Now let's try to fit simple models. Althought based on the analysis above we'd expect that the model won't perform well, it's still interesting to see 
+
+We first select the variables of interest from the dataset to prepare for modeling.
+```{r}
+#select the variables for modeling
+spotify_model <- spotify[c(5,6,8,10:16,19)]
+head(spotify_model)
+```
+
+####Predicting popularity with backward selection 
+
+```{r}
+popularity_full <- lm(track_popularity ~ ., data = spotify_model)
+summary(popularity_full)
+```
+
+The predictive variables are all statistically significant but R-squared of the model is only about 0.09, which means that the model only explains about 9% of the variations in popularity. 
+
+```{r}
+popularity_backAIC <- step(popularity_full, direction = "backward")
+summary(popularity_backAIC)
+```
+
+####Predicting popularity with forward selection 
+```{r}
+popularity_null <- lm(track_popularity ~ 1, data = spotify_model)
+summary(popularity_null)
+```
+
+```{r}
+popularity_forwardAIC <- step(popularity_null, direction = "forward", scope = formula(popularity_full))
+summary(popularity_forwardAIC)
+```
+
